@@ -61,56 +61,23 @@ Open **http://localhost:8501** in your browser.
 flowchart TD
     START([START]) --> FD
 
-    subgraph P3["Plain Python — no AI"]
-        FD["fetch_data_node
-        ────────────────
-        fetch_bank_data()
-        fetch_stripe_data()"]
-    end
-
+    FD["fetch_data_node — pulls bank + Stripe records"]
     FD --> RN
 
-    subgraph P2["Claude — structured judgment"]
-        RN["reconcile_node
-        ────────────────
-        with_structured_output()
-        Returns: list[Discrepancy]"]
-    end
-
+    RN["reconcile_node — Claude finds discrepancies"]
     RN --> CE
 
-    subgraph ROUTING["LangGraph conditional edge"]
-        CE{"Discrepancies found?"}
-    end
-
+    CE{"Discrepancies found?"}
+    CE -->|No|  END_CLEAN([END])
     CE -->|Yes| HR
-    CE -->|No| END_CLEAN([END — clean])
 
-    subgraph P4["Human-in-the-loop interrupt"]
-        HR["human_review_node
-        ────────────────
-        Graph PAUSES
-        State saved to MemorySaver
-        Human submits decisions
-        Graph RESUMES"]
-    end
-
-    HR --> END_DONE([END — complete])
-
-    subgraph P5["Observability"]
-        LS["LangSmith
-        ────────────────
-        Traces every LLM call
-        Exact prompt and response"]
-    end
-
-    RN -.->|every call traced| LS
+    HR["human_review_node — graph pauses · human decides · graph resumes"]
+    HR --> END_DONE([END])
 
     style FD        fill:#d4edda,stroke:#28a745,color:#000
     style RN        fill:#cce5ff,stroke:#004085,color:#000
     style CE        fill:#fff3cd,stroke:#856404,color:#000
     style HR        fill:#f8d7da,stroke:#721c24,color:#000
-    style LS        fill:#e2d9f3,stroke:#6f42c1,color:#000
     style START     fill:#343a40,color:#fff,stroke:#343a40
     style END_CLEAN fill:#28a745,color:#fff,stroke:#28a745
     style END_DONE  fill:#28a745,color:#fff,stroke:#28a745
@@ -118,11 +85,12 @@ flowchart TD
 
 | Colour | Layer |
 |---|---|
-| Green | Plain Python — fetch, routing logic |
-| Blue | LangChain + Claude — AI judgment |
+| Green | Plain Python |
+| Blue | Claude AI — structured judgment |
 | Yellow | LangGraph — conditional routing |
 | Red | Human-in-the-loop — graph pauses and waits |
-| Purple | LangSmith — observability |
+
+> LangSmith traces every Claude call automatically when `LANGCHAIN_TRACING_V2=true` is set — see [Enabling LangSmith tracing](#enabling-langsmith-tracing) below.
 
 ---
 

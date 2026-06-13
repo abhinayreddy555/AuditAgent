@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/python.exe -c \"import langgraph, langchain_anthropic, pydantic, dotenv; print\\('All packages OK'\\)\")",
+      "Bash(.venv/Scripts/pip.exe install *)",
+      "Bash(.venv/Scripts/python.exe main.py)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(.venv/Scripts/python.exe -c \"import streamlit; print\\('streamlit', streamlit.__version__\\)\")",
+      "Bash(.venv/Scripts/streamlit.exe run *)",
+      "Bash(timeout 4)",
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}
