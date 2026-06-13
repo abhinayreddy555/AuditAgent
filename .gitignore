@@ -17,6 +17,15 @@ __pycache__/
 # Generated output
 report.html
 
+# User data uploads (keep sample data but ignore user CSVs in data/ root)
+data/bank_export.csv
+data/stripe_export.csv
+
+# Large public datasets (Kaggle etc)
+scripts/fraudTrain.csv
+scripts/fraudTest.csv
+*.csv.gz
+
 # LangSmith / LangChain cache
 .langchain/
 .langsmith/

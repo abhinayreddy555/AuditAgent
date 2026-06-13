@@ -9,7 +9,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from agent.models import AgentState, ReconciliationResult, Discrepancy
 from agent.tools import lookup_merchant_alias
-from agent.data import fetch_bank_data, fetch_stripe_data
+from agent.loaders import get_loader
 
 
 # ── LLM ────────────────────────────────────────────────────────────────────────
@@ -73,15 +73,23 @@ def _fmt(bank, stripe) -> str:
 # ── Nodes ───────────────────────────────────────────────────────────────────────
 
 def fetch_data_node(state: AgentState) -> AgentState:
-    print("\n[fetch_data_node] Fetching transactions from sources...")
-    bank = fetch_bank_data()
-    stripe = fetch_stripe_data()
-    print(f"  Bank: {len(bank)} txns   Stripe: {len(stripe)} txns")
+    """Loads from the default loader (fixture / csv env var). Used by CLI and API."""
+    loader = get_loader()
+    bank   = loader.fetch_bank()
+    stripe = loader.fetch_stripe()
+    print(f"[fetch_data_node] bank={len(bank)} stripe={len(stripe)}")
     return {**state, "bank_transactions": bank, "stripe_transactions": stripe}
 
 
+def _make_preloaded_fetch_node(bank: list, stripe: list):
+    """Returns a fetch node with data baked in via closure. Used by Streamlit UI."""
+    def preloaded_fetch_node(state: AgentState) -> AgentState:
+        return {**state, "bank_transactions": bank, "stripe_transactions": stripe}
+    return preloaded_fetch_node
+
+
 def reconcile_node(state: AgentState) -> AgentState:
-    print("\n[reconcile_node] Sending to Claude for comparison...")
+    print(f"[reconcile_node] bank={len(state['bank_transactions'])} stripe={len(state['stripe_transactions'])}")
     llm = (
         get_llm()
         .bind_tools([lookup_merchant_alias])
@@ -92,11 +100,7 @@ def reconcile_node(state: AgentState) -> AgentState:
         HumanMessage(content=_fmt(state["bank_transactions"], state["stripe_transactions"])),
     ]
     result: ReconciliationResult = llm.invoke(messages)
-    print(f"  Found {len(result.discrepancies)} discrepancy(ies):")
-    for i, d in enumerate(result.discrepancies):
-        print(f"    [{i}] bank={d.bank_txn_id}  stripe={d.stripe_txn_id}  "
-              f"confidence={d.confidence}")
-        print(f"         {d.reason}")
+    print(f"[reconcile_node] found {len(result.discrepancies)} discrepancy(ies)")
     return {
         **state,
         "discrepancies": result.discrepancies,
@@ -105,13 +109,13 @@ def reconcile_node(state: AgentState) -> AgentState:
 
 
 def human_review_node(state: AgentState) -> AgentState:
-    print("\n[human_review_node] Processing human decisions...")
+    _log(f"\n[human_review_node] Processing human decisions...")
     decisions = state.get("human_decisions", {})
     approved, rejected, escalated = [], [], []
 
     for i, d in enumerate(state["discrepancies"]):
         decision = decisions.get(i, decisions.get(str(i), "no_decision"))
-        print(f"  [{i}] {d.reason[:65]}  => {decision.upper()}")
+        _log(f"  [{i}] {d.reason[:65]}  => {decision.upper()}")
         if decision == "approve":
             approved.append(i)
         elif decision == "reject":
@@ -119,7 +123,7 @@ def human_review_node(state: AgentState) -> AgentState:
         else:
             escalated.append(i)
 
-    print(f"\n  Approved: {len(approved)}  Rejected: {len(rejected)}  Escalated: {len(escalated)}")
+    _log(f"\n  Approved: {len(approved)}  Rejected: {len(rejected)}  Escalated: {len(escalated)}")
     return {
         **state,
         "status": "complete_with_escalations" if escalated else "complete_all_resolved",
@@ -134,10 +138,20 @@ def route_after_reconcile(state: AgentState) -> str:
 
 # ── Graph factory ───────────────────────────────────────────────────────────────
 
-def build_graph(checkpointer=None):
+def build_graph(checkpointer=None, bank=None, stripe=None):
+    """
+    Build the agent graph.
+    Pass bank + stripe to bake preloaded data into the fetch node (used by Streamlit UI).
+    Omit both to use the default loader from DATA_SOURCE env var (CLI / API).
+    """
     graph = StateGraph(AgentState)
 
-    graph.add_node("fetch_data_node", fetch_data_node)
+    if bank and stripe:
+        fetch_node = _make_preloaded_fetch_node(bank, stripe)
+    else:
+        fetch_node = fetch_data_node
+
+    graph.add_node("fetch_data_node", fetch_node)
     graph.add_node("reconcile_node", reconcile_node)
     graph.add_node("human_review_node", human_review_node)
 
