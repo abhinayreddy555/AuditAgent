@@ -132,26 +132,26 @@ Practical limits: up to ~500 rows works well in one call. For larger datasets, c
 
 ```mermaid
 flowchart TD
-    START([START]) --> FD
+    START([START])
+    FD["fetch_data_node\nPulls bank and Stripe records"]
+    RN["reconcile_node\nClaude finds discrepancies"]
+    CE{Discrepancies found?}
+    HR["human_review_node\nGraph pauses, human decides, graph resumes"]
+    END_CLEAN([END])
+    END_DONE([END])
 
-    FD["fetch_data_node — pulls bank + Stripe records"]
+    START --> FD
     FD --> RN
-
-    RN["reconcile_node — Claude finds discrepancies"]
     RN --> CE
-
-    CE{"Discrepancies found?"}
-    CE -->|No|  END_CLEAN([END])
+    CE -->|No| END_CLEAN
     CE -->|Yes| HR
+    HR --> END_DONE
 
-    HR["human_review_node — graph pauses · human decides · graph resumes"]
-    HR --> END_DONE([END])
-
+    style START     fill:#343a40,color:#fff,stroke:#343a40
     style FD        fill:#d4edda,stroke:#28a745,color:#000
     style RN        fill:#cce5ff,stroke:#004085,color:#000
     style CE        fill:#fff3cd,stroke:#856404,color:#000
     style HR        fill:#f8d7da,stroke:#721c24,color:#000
-    style START     fill:#343a40,color:#fff,stroke:#343a40
     style END_CLEAN fill:#28a745,color:#fff,stroke:#28a745
     style END_DONE  fill:#28a745,color:#fff,stroke:#28a745
 ```
@@ -159,11 +159,11 @@ flowchart TD
 | Colour | Layer |
 |---|---|
 | Green | Plain Python |
-| Blue | Claude AI — structured judgment |
-| Yellow | LangGraph — conditional routing |
-| Red | Human-in-the-loop — graph pauses and waits |
+| Blue | Claude AI |
+| Yellow | Conditional routing |
+| Red | Human-in-the-loop |
 
-> LangSmith traces every Claude call automatically when `LANGCHAIN_TRACING_V2=true` is set — see [Enabling LangSmith tracing](#enabling-langsmith-tracing) below.
+> LangSmith traces every Claude call automatically when `LANGCHAIN_TRACING_V2=true` is set. See [Enabling LangSmith tracing](#enabling-langsmith-tracing) below.
 
 ---
 
